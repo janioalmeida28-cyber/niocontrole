@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NioControle</title>
+<meta name="theme-color" content="#000000">
+<meta name="description" content="Controle de combustível: média km/l, custo por km e projeção de gastos.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0e0e0e; --card:#181818; --card2:#202020; --line:#2c2c2c;
+    --y:#FFC400; --y2:#ffd84d; --txt:#f2f2f2; --mut:#9a9a9a;
+    --ok:#3ecf8e; --bad:#ff6b5b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font-family:Inter,system-ui,sans-serif;font-size:15px;min-height:100vh;padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+  header{background:#000;border-bottom:3px solid var(--y);padding:10px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:5}
+  .logo{width:38px;height:38px;background:var(--y);border-radius:9px;display:grid;place-items:center;flex:none}
+  h1{font-family:'Barlow Condensed',sans-serif;font-size:28px;letter-spacing:.5px;line-height:1}
+  h1 span{color:var(--y)}
+  .sub{font-size:11px;color:var(--mut);letter-spacing:.4px;text-transform:uppercase;margin-top:2px}
+  .status{margin-left:auto;font-size:11px;color:var(--mut);text-align:right}
+  main{max-width:640px;margin:0 auto;padding:16px}
+  h2{font-family:'Barlow Condensed',sans-serif;font-size:18px;text-transform:uppercase;letter-spacing:.5px;margin:18px 0 10px;display:flex;align-items:center;gap:8px}
+  h2::before{content:"";width:4px;height:18px;background:var(--y);border-radius:2px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+  label{display:block;font-size:12px;color:var(--mut);margin:12px 0 5px;font-weight:500}
+  textarea{width:100%;background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:12px;font-size:13px;font-family:monospace;min-height:90px;resize:vertical}
+  input,select{width:100%;background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:12px;font-size:16px;font-family:inherit}
+  input:focus,select:focus{outline:none;border-color:var(--y)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  button{font-family:inherit;cursor:pointer;border:none;border-radius:10px;font-size:15px;font-weight:600;padding:13px 16px}
+  .btn{background:var(--y);color:#000;width:100%;margin-top:16px}
+  .btn:active{background:var(--y2)}
+  .btn:disabled{opacity:.5}
+  .ghost{background:transparent;color:var(--mut);border:1px solid var(--line);padding:8px 12px;font-size:13px}
+  .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+  .chip{background:var(--card);border:1px solid var(--line);color:var(--txt);padding:10px 14px;border-radius:999px;white-space:nowrap;font-size:14px;font-weight:500}
+  .chip.on{background:var(--y);color:#000;border-color:var(--y)}
+  .chip.add{color:var(--y);border-style:dashed}
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 13px}
+  .kpi.hl{background:var(--y);color:#000;border-color:var(--y)}
+  .kpi small{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.6px;opacity:.75;font-weight:600}
+  .kpi b{display:block;font-family:'Barlow Condensed',sans-serif;font-size:28px;line-height:1.1;margin-top:2px}
+  .kpi em{font-style:normal;font-size:12px;opacity:.75}
+  .full{grid-column:1/-1}
+  .veh{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .veh .t{font-weight:700;font-size:17px}
+  .veh .s{color:var(--mut);font-size:13px;margin-top:4px}
+  .tag{display:inline-block;background:var(--card2);border:1px solid var(--line);border-radius:6px;padding:2px 7px;font-size:11px;margin:0 4px 4px 0;color:var(--y)}
+  .tag.p{color:var(--mut)}
+  .list .it{border-top:1px solid var(--line);padding:12px 0;display:grid;grid-template-columns:1fr auto;gap:4px 10px}
+  .list .it:first-child{border-top:none;padding-top:0}
+  .it .d{font-weight:600}
+  .it .m{color:var(--mut);font-size:13px}
+  .it .r{text-align:right}
+  .it .r b{color:var(--y);font-family:'Barlow Condensed',sans-serif;font-size:20px}
+  .it .acts{grid-column:1/-1;display:flex;gap:8px;margin-top:4px}
+  .delta{font-size:12px;font-weight:600}
+  .up{color:var(--ok)} .down{color:var(--bad)}
+  .empty{color:var(--mut);text-align:center;padding:22px 10px;font-size:14px;line-height:1.5}
+  .msg{font-size:13px;margin-top:10px;min-height:18px}
+  .msg.err{color:var(--bad)} .msg.ok{color:var(--ok)}
+  .hint{font-size:12px;color:var(--mut);margin-top:8px;line-height:1.4}
+  .hidden{display:none!important}
+  .preview{background:var(--card2);border-radius:10px;padding:10px 12px;margin-top:12px;font-size:13px;color:var(--mut);line-height:1.5}
+  .preview b{color:var(--y)}
+  .del{color:var(--bad)!important;border-color:var(--bad)!important}
+  .alert{border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.45;margin-bottom:10px;border:1px solid}
+  .alert.warn{background:rgba(255,107,91,.08);border-color:rgba(255,107,91,.4)}
+  .alert.good{background:rgba(62,207,142,.08);border-color:rgba(62,207,142,.4)}
+  .alert.info{background:rgba(255,196,0,.07);border-color:rgba(255,196,0,.35)}
+  .alert strong{display:block;margin-bottom:2px}
+  .toggle{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:14px;cursor:pointer}
+  .toggle input{width:20px;height:20px;accent-color:var(--y)}
+  .tabs{display:flex;gap:6px;margin-bottom:10px}
+  .tabs button{flex:1;padding:8px;font-size:13px;background:var(--card2);color:var(--mut);border:1px solid var(--line)}
+  .tabs button.on{background:var(--y);color:#000;border-color:var(--y)}
+  svg text{font-family:Inter,sans-serif}
+  .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:10;background:#000;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+  .tabbar button{background:none;color:var(--mut);display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:600;padding:6px 2px;border-radius:12px}
+  .tabbar svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .tabbar button.on{color:var(--y);background:rgba(255,196,0,.1)}
+  .seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px;gap:4px;margin-top:4px}
+  .seg button{flex:1;background:none;color:var(--mut);padding:9px 4px;font-size:13px;border-radius:9px}
+  .seg button.on{background:var(--y);color:#000}
+  .list .it{cursor:pointer}
+  .list .it .acts{display:none}
+  .list .it.open .acts{display:flex}
+  details summary::-webkit-details-marker{display:none}
+  .hero{background:linear-gradient(140deg,#FFC400 0%,#FFB000 100%);color:#000;border-radius:20px;padding:16px 18px 14px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-40px;top:-40px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.18)}
+  .hero-top{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;position:relative;z-index:1}
+  .trend{background:#000;color:var(--y);border-radius:999px;padding:4px 9px;font-size:12px;letter-spacing:0;text-transform:none}
+  .trend.down{color:#ff8a7d}
+  .hero-mid{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:4px;position:relative;z-index:1}
+  .hero-val{font-family:'Barlow Condensed',sans-serif;font-size:64px;font-weight:700;line-height:.95}
+  .hero-val span{font-size:22px;margin-left:4px}
+  .hero-foot{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(0,0,0,.15);position:relative;z-index:1}
+  .hero-foot small{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;opacity:.65}
+  .hero-foot strong{font-family:'Barlow Condensed',sans-serif;font-size:21px}
+  .gauge{display:flex;align-items:center;gap:14px;margin-top:10px}
+  .gauge svg{flex:none}
+  .gauge .gt{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+  .gauge .gv{font-family:'Barlow Condensed',sans-serif;font-size:30px;line-height:1.05;margin-top:2px}
+  .gauge .gv span{color:var(--y)}
+  .gauge .gs{font-size:12px;color:var(--mut);margin-top:3px;line-height:1.4}
+  .ki{display:flex;align-items:center;gap:6px}
+  .ki svg{width:15px;height:15px;fill:none;stroke:var(--y);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+  .btn-out{width:100%;margin-top:14px;background:transparent;color:var(--y);border:1.5px solid var(--y)}
+  .btn-out:active{background:rgba(255,196,0,.1)}
+  .alert{padding:10px 12px;font-size:12.5px}
+  .toast{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);background:var(--y);color:#000;font-weight:600;padding:10px 18px;border-radius:999px;opacity:0;transition:.25s;pointer-events:none;z-index:20;font-size:14px}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  .verdict{font-family:'Barlow Condensed',sans-serif;font-size:26px;color:var(--y);margin-top:12px}
+  .cmp{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+  .cmp div{background:var(--card2);border-radius:10px;padding:10px;font-size:13px;color:var(--mut)}
+  .cmp b{display:block;color:var(--txt);font-size:18px;margin-top:2px}
+  .cmp .win{outline:2px solid var(--y)}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v17"/><path d="M2 22h13"/><path d="M14 10h2a2 2 0 0 1 2 2v4a1.5 1.5 0 0 0 3 0V8l-3-3"/><path d="M6 8h5"/></svg></div>
+  <div><h1>Nio<span>Controle</span></h1><div class="sub">Controle de combustível</div></div>
+  <div class="status" id="status">Carregando…</div>
+</header>
+
+<main>
+  <!-- ===== RESUMO ===== -->
+  <section data-tab="resumo">
+    <div class="chips" id="chips"></div>
+  <!-- Formulário de veículo -->
+  <div class="card hidden" id="vehForm" style="margin-top:12px">
+    <div style="font-weight:600" id="vehFormTitle">Novo veículo</div>
+    <label>Modelo</label>
+    <input id="vModelo" placeholder="Ex.: HB20 1.0" maxlength="60">
+    <div class="row">
+      <div><label>Tipo</label>
+        <select id="vTipo"><option>Carro</option><option>Moto</option><option>Caminhonete</option><option>Utilitário</option><option>Caminhão</option></select></div>
+      <div><label>Combustível</label>
+        <select id="vComb"><option>Flex</option><option>Gasolina</option><option>Etanol</option><option>Diesel</option><option>GNV</option></select></div>
+    </div>
+    <div class="row">
+      <div><label>Placa (opcional)</label><input id="vPlaca" placeholder="ABC1D23" maxlength="8" style="text-transform:uppercase"></div>
+      <div><label>Tanque (litros, opcional)</label><input type="number" inputmode="decimal" id="vTanque" placeholder="Ex.: 50"></div>
+    </div>
+    <p class="hint">Com a capacidade do tanque, o app calcula a autonomia estimada do veículo.</p>
+    <button class="btn" id="vSave">Salvar veículo</button>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="ghost" id="vCancel">Cancelar</button>
+      <button class="ghost del hidden" id="vDelete">Excluir veículo</button>
+    </div>
+    <div class="msg" id="vMsg"></div>
+  </div>
+
+
+    <div class="card empty hidden" id="noVeh" style="margin-top:12px">
+      Nenhum veículo cadastrado ainda.<br>Toque em <b style="color:var(--y)">+ Novo veículo</b> para começar.<br>
+      <button class="ghost" style="margin-top:12px" data-go="hist">Já tenho backup — restaurar</button>
+    </div>
+    <div id="mainArea">
+      <div class="card" id="vehInfo" style="margin-top:12px"></div>
+      <div id="alerts" style="margin-top:12px"></div>
+      <div id="hero"></div>
+      <div id="gauge"></div>
+      <div class="kpis" id="kpis" style="margin-top:10px"></div>
+      <div class="kpis" id="resumoProj" style="margin-top:10px"></div>
+      <button class="btn-out" data-go="abastecer">+ Registrar abastecimento</button>
+    </div>
+  </section>
+
+  <!-- ===== ABASTECER ===== -->
+  <section data-tab="abastecer" class="hidden">
+    <h2 id="fTitle">Novo abastecimento</h2>
+    <div class="needVeh">
+    <div class="card">
+      <div class="row">
+        <div><label>Data</label><input type="date" id="fData"></div>
+        <div><label>KM atual (odômetro)</label><input type="number" inputmode="numeric" id="fKm" placeholder="Ex.: 117450"></div>
+      </div>
+      <div class="row">
+        <div><label>Litros abastecidos</label><input type="number" inputmode="decimal" step="0.01" id="fLitros" placeholder="Ex.: 40,5"></div>
+        <div><label>Valor pago (R$)</label><input type="number" inputmode="decimal" step="0.01" id="fValor" placeholder="Ex.: 150,00"></div>
+      </div>
+      <div class="row">
+        <div><label>Combustível usado</label>
+          <select id="fComb"><option>Gasolina</option><option>Etanol</option><option>Diesel</option><option>GNV</option></select></div>
+        <div><label>Posto (opcional)</label><input id="fPosto" placeholder="Ex.: Shell Centro" maxlength="40" list="postos"><datalist id="postos"></datalist></div>
+      </div>
+      <label>Nível do tanque ANTES de abastecer</label>
+      <select id="fNivel"></select>
+      <input type="number" inputmode="decimal" step="0.1" id="fAntesL" class="hidden" placeholder="Litros que havia no tanque" style="margin-top:8px">
+      <label class="toggle"><input type="checkbox" id="fCheio" checked> Completei o tanque</label>
+      <div class="preview" id="fPrev">Preencha os campos para ver a prévia do cálculo.</div>
+      <button class="btn" id="fSave">Salvar abastecimento</button>
+      <div class="msg" id="fMsg"></div>
+      <details class="hint" style="margin-top:12px"><summary style="cursor:pointer;color:var(--y)">Como a média é calculada?</summary><p style="margin-top:6px">Olhe o ponteiro antes de abastecer e informe o nível. O app soma o que foi colocado com o que já havia e calcula o consumo real: <b style="color:var(--txt)">combustível que havia depois do abastecimento anterior − o que restava agora</b>. Assim a média sai certa mesmo sem completar o tanque.</p></details>
+    </div>
+
+    </div>
+  </section>
+
+  <!-- ===== ANÁLISE ===== -->
+  <section data-tab="analise" class="hidden">
+    <div class="needVeh">
+      <div class="seg" id="anSeg"><button class="on" data-an="proj">Projeção</button><button data-an="evol">Evolução</button><button data-an="cmp">Etanol × Gas.</button></div>
+      <div data-an-p="proj">
+        <h2>Projeção de gastos</h2>
+        <div class="kpis" id="proj"></div>
+        <h2>Visão geral</h2>
+        <div class="kpis" id="geral"></div>
+      </div>
+      <div data-an-p="evol" class="hidden">
+        <h2>Evolução</h2>
+    <div class="card">
+      <div class="tabs"><button class="on" data-g="media">Média km/l</button><button data-g="custo">Custo/km</button><button data-g="preco">Preço/L</button></div>
+      <div id="chart"></div>
+    </div>
+
+      </div>
+      <div data-an-p="cmp" class="hidden">
+        <h2>Etanol ou gasolina?</h2>
+    <div class="card">
+      <div class="row">
+        <div><label>Etanol (R$/L)</label><input type="number" inputmode="decimal" step="0.01" id="cEt" placeholder="Ex.: 3,56"></div>
+        <div><label>Gasolina (R$/L)</label><input type="number" inputmode="decimal" step="0.01" id="cGas" placeholder="Ex.: 6,19"></div>
+      </div>
+      <div id="cmpOut" class="preview">Informe o preço dos dois combustíveis no posto.</div>
+    </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== HISTÓRICO ===== -->
+  <section data-tab="hist" class="hidden">
+    <div class="needVeh">
+      <h2>Histórico</h2>
+      <div class="card list" id="hist"></div>
+    </div>
+    <details class="card" id="bkBox" style="margin-top:16px">
+      <summary style="cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between">Backup dos dados <span style="color:var(--y)">▾</span></summary>
+      <div style="margin-top:12px">
+  <div>
+    <div class="row">
+      <button class="ghost" id="bDown" style="padding:12px;color:var(--y);border-color:var(--y)">Baixar arquivo</button>
+      <button class="ghost" id="bCopy" style="padding:12px;color:var(--y);border-color:var(--y)">Copiar backup</button>
+    </div>
+    <p class="hint" id="bInfo" style="margin-bottom:4px">Guarde uma cópia dos seus dados. Baixe o arquivo (ou copie o texto) e salve no Drive ou no WhatsApp.</p>
+    <label>Restaurar backup</label>
+    <textarea id="bText" placeholder="Cole aqui o texto do backup…"></textarea>
+    <div class="row" style="margin-top:10px">
+      <label class="ghost" style="margin:0;text-align:center;padding:12px;border-radius:10px;cursor:pointer;color:var(--txt)">Escolher arquivo<input type="file" id="bFile" accept=".json,application/json,text/plain" class="hidden"></label>
+      <button class="ghost" id="bRestore" style="padding:12px;color:var(--txt)">Restaurar</button>
+    </div>
+    <div class="msg" id="bMsg"></div>
+  </div>
+      </div>
+    </details>
+  </section>
+</main>
+
+<div id="toast" class="toast"></div>
+<nav class="tabbar">
+  <button data-go="resumo" class="on"><svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>Resumo</button>
+  <button data-go="abastecer"><svg viewBox="0 0 24 24"><path d="M3 22V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v17"/><path d="M2 22h13"/><path d="M14 10h2a2 2 0 0 1 2 2v4a1.5 1.5 0 0 0 3 0V8l-3-3"/><path d="M6 8h5"/></svg>Abastecer</button>
+  <button data-go="analise"><svg viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg>Análise</button>
+  <button data-go="hist"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>Histórico</button>
+</nav>
+
+<script>
+(() => {
+  // ---------- Estado ----------
+  let vehicles = [], fuels = [], selId = null, editVehId = null, editFuelId = null, graph = 'media';
+  let store = null;
+  const $ = id => document.getElementById(id);
+  const brl = n => n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  const num = (n,d=2) => n.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
+  const int = n => Math.round(n).toLocaleString('pt-BR');
+  const pct = n => (n>0?'+':'') + num(n*100,1) + '%';
+  const fmtDate = s => { const [y,m,d] = s.split('-'); return `${d}/${m}/${y}`; };
+  const shortDate = s => { const [,m,d] = s.split('-'); return `${d}/${m}`; };
+  const toISO = d => { d = new Date(d); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
+  const today = () => toISO(new Date());
+  const days = (a,b) => Math.round((new Date(b+'T12:00') - new Date(a+'T12:00'))/864e5);
+  const rid = p => p + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const lsGet = k => { try { return localStorage.getItem(k); } catch(e) { return null; } };
+  const lsSet = (k,v) => { try { localStorage.setItem(k,v); } catch(e) {} };
+
+  // ---------- Persistência ----------
+  const LS = 'ctrl-combustivel-v1';
+  function localStore() {
+    let mem = {};
+    try { mem = JSON.parse(lsGet(LS) || '{}'); } catch(e) {}
+    const all = () => Object.entries(mem).map(([id,d]) => ({id, ...d}));
+    const flush = () => lsSet(LS, JSON.stringify(mem));
+    load(all());
+    return {
+      save: async (id,obj) => { mem[id] = obj; flush(); load(all()); },
+      remove: async id => { delete mem[id]; flush(); load(all()); }
+    };
+  }
+
+  function load(docs) {
+    vehicles = docs.filter(d => d.kind === 'veh').sort((a,b) => (a.criado||0)-(b.criado||0));
+    fuels = docs.filter(d => d.kind === 'fuel');
+    if (!vehicles.find(v => v.id === selId)) selId = vehicles[0]?.id || null;
+    render();
+  }
+
+  async function init() {
+    $('fData').value = today();
+    const g = lsGet('nio-gas'); if (g) $('cGas').value = g;
+    let db = null, uid = null;
+    try {
+      if (window.claude?.use) {
+        db = await window.claude.use('db');
+        const user = await window.claude.use('user');
+        uid = user ? await user.id() : null;
+      }
+    } catch(e) { db = null; }
+
+    if (db && uid) {
+      const col = db.collection('data/users/' + uid);
+      const timer = setTimeout(() => { $('status').textContent = 'Sem conexão — tentando…'; }, 10000);
+      col.onSnapshot(snap => {
+        if (!snap.metadata.fromCache) { clearTimeout(timer); $('status').innerHTML = 'Salvo na nuvem<br>☁︎ sincronizado'; }
+        load(snap.docs.map(d => ({id: d.id, ...d.data()})));
+      }, () => { clearTimeout(timer); $('status').textContent = 'Erro ao sincronizar'; });
+      store = { save: (id,obj) => col.doc(id).set(obj), remove: id => col.doc(id).delete() };
+    } else {
+      $('status').innerHTML = inClaude ? 'Modo local<br>(só neste aparelho)' : 'Salvo neste<br>aparelho';
+      store = localStore();
+    }
+  }
+
+  // ---------- Cálculos ----------
+  const isFull = f => f.cheio !== false;
+  function fuelsOf(vid) {
+    return fuels.filter(f => f.vehId === vid).sort((a,b) => a.km - b.km || a.data.localeCompare(b.data));
+  }
+  // Cálculo pelo nível do tanque:
+  // consumo = combustível que havia após o abastecimento de referência
+  //         + litros colocados no meio do caminho − o que restava antes deste abastecimento.
+  // Tanque cheio sem nível informado: considera que faltava exatamente o que foi colocado.
+  function capOf(vid) { const v = vehicles.find(x => x.id === (vid || selId)); return v?.tanque > 0 ? v.tanque : null; }
+  function withStats(list, vid) {
+    const cap = capOf(vid), P = cap || 1000; // sem tanque cadastrado, cheio→cheio continua exato (a capacidade se cancela)
+    let K = null; // K = último ponto com nível do tanque conhecido
+    return list.map((f,i) => {
+      const precoL = f.litros > 0 ? f.valor / f.litros : null;
+      const r = { ...f, precoL, kmRod: null, media: null, custoKm: null, litSeg: null, valSeg: null, antesL: null, depois: null };
+      const full = isFull(f);
+      const antes = f.antes != null ? f.antes : (full ? Math.max(0, P - f.litros) : null);
+      r.antesL = f.antes != null ? f.antes : null;
+      if (antes != null && K) {
+        const meio = list.slice(K.i + 1, i);
+        const consumo = K.depois + meio.reduce((a,x) => a + x.litros, 0) - antes;
+        const km = f.km - K.km;
+        if (km > 0 && consumo > 0.5) {
+          r.kmRod = km; r.litSeg = consumo; r.valSeg = consumo * precoL; // combustível consumido ao preço deste abastecimento
+          r.media = km / consumo; r.custoKm = r.valSeg / km; r.dias = days(K.data, f.data);
+        }
+      }
+      const depois = full ? P : (antes != null ? Math.min(antes + f.litros, P) : null);
+      r.depois = depois;
+      if (depois != null) K = { i, km: f.km, data: f.data, depois };
+      return r;
+    });
+  }
+  // Estimativa de quanto há no tanque num dado KM, pela média histórica
+  function estimaTanque(km) {
+    const st = withStats(fuelsOf(selId)), ov = overall(st);
+    if (!ov) return null;
+    let k = -1; for (let i = st.length - 1; i >= 0; i--) if (st[i].depois != null && st[i].km < km) { k = i; break; }
+    if (k < 0) return null;
+    const meio = st.slice(k + 1).filter(x => x.km < km).reduce((a,x) => a + x.litros, 0);
+    return st[k].depois + meio - (km - st[k].km) / ov.media;
+  }
+  function overall(list) {
+    const val = list.filter(f => f.media != null);
+    if (!val.length) return null;
+    const km = val.reduce((s,f) => s + f.kmRod, 0);
+    const lt = val.reduce((s,f) => s + f.litSeg, 0);
+    const vl = val.reduce((s,f) => s + f.valSeg, 0);
+    return { val, km, lt, vl, media: km/lt, custoKm: vl/km };
+  }
+
+  // ---------- Render ----------
+  function render() {
+    renderChips();
+    const has = vehicles.length > 0;
+    const formOpen = !$('vehForm').classList.contains('hidden');
+    $('mainArea').classList.toggle('hidden', !has || formOpen);
+    $('noVeh').classList.toggle('hidden', has || formOpen);
+    document.querySelectorAll('.needVeh').forEach(el => el.classList.toggle('hidden', !has));
+    document.querySelectorAll('section[data-tab]:not([data-tab=resumo])').forEach(sec => {
+      let e = sec.querySelector('.noVehMsg');
+      if (!has && sec.dataset.tab !== 'hist') { if (!e) { e = document.createElement('div'); e.className = 'card empty noVehMsg'; e.style.marginTop = '16px'; e.innerHTML = 'Cadastre um veículo na aba <b style="color:var(--y)">Resumo</b> para começar.'; sec.prepend(e); } }
+      else if (e) e.remove();
+    });
+    if (!has) return;
+    const v = vehicles.find(x => x.id === selId);
+    const list = withStats(fuelsOf(selId));
+    const ov = overall(list);
+    const last = list[list.length-1];
+    const lastCalc = [...list].reverse().find(f => f.media != null);
+
+    // Veículo
+    const autonomia = v.tanque && ov ? v.tanque * ov.media : null;
+    $('vehInfo').innerHTML = `<div class="veh"><div><div class="t">${esc(v.modelo)} <span style="font-size:12px;font-weight:500;color:var(--mut)">${esc(v.tipo)}</span></div>
+      <div class="s">${[v.placa, v.comb, v.tanque ? `${num(v.tanque,0)} L` : null, last ? `${int(last.km)} km` : null].filter(Boolean).map(esc).join(' • ')}</div>
+      ${!v.tanque ? `<div class="s" style="color:var(--y)">Informe o tamanho do tanque em Editar para ver o medidor.</div>` : ''}</div>
+      <button class="ghost" id="editVeh">Editar</button></div>`;
+    $('editVeh').onclick = () => openVehForm(v);
+    if (!editFuelId && !$('fComb').dataset.touched) {
+      $('fComb').value = last?.comb || ({Flex:'Gasolina'}[v.comb] || v.comb);
+    }
+    // opções de nível do tanque
+    const capV = v.tanque > 0 ? v.tanque : null, curN = $('fNivel').value;
+    const fr = [['0.08','Reserva (luz acesa)'],['0.125','1/8'],['0.25','1/4'],['0.375','3/8'],['0.5','1/2'],['0.625','5/8'],['0.75','3/4'],['0.875','7/8']];
+    $('fNivel').innerHTML = '<option value="">Não sei / não olhei</option>' +
+      (capV ? fr.map(([val,t]) => `<option value="${val}">${t} — cerca de ${num(capV*val,1)} L</option>`).join('') : '') +
+      '<option value="L">Informar em litros</option>';
+    if ([...$('fNivel').options].some(o => o.value === curN)) $('fNivel').value = curN;
+    $('fAntesL').classList.toggle('hidden', $('fNivel').value !== 'L');
+    // postos usados
+    const postos = [...new Set(fuels.map(f => f.posto).filter(Boolean))];
+    $('postos').innerHTML = postos.map(p => `<option value="${esc(p)}">`).join('');
+
+    renderLast(list, last, lastCalc, ov);
+    renderProj(list, ov);
+    renderCmp(list);
+    renderChart(list);
+    renderGeral(list, ov);
+    renderHist(list);
+    preview();
+  }
+
+  const ICO = {
+    road:'<svg viewBox="0 0 24 24"><path d="M4 21L8 3"/><path d="M20 21L16 3"/><path d="M12 5v2M12 11v2M12 17v2"/></svg>',
+    money:'<svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>',
+    cal:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>',
+    pump:'<svg viewBox="0 0 24 24"><path d="M3 22V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v17"/><path d="M2 22h13"/><path d="M14 10h2a2 2 0 0 1 2 2v4a1.5 1.5 0 0 0 3 0V8l-3-3"/></svg>'
+  };
+  function ritmo(list) {
+    if (list.length < 2) return null;
+    const first = list[0], last = list[list.length-1];
+    return (last.km - first.km) / Math.max(1, days(first.data, last.data));
+  }
+  function spark(vals) {
+    if (vals.length < 2) return '';
+    const W = 120, H = 46, mn = Math.min(...vals), mx = Math.max(...vals), r = (mx - mn) || 1;
+    const pts = vals.map((v,i) => [4 + i * (W-8) / (vals.length-1), 6 + (1 - (v - mn) / r) * (H-12)]);
+    const d = pts.map((p,i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+    const lp = pts[pts.length-1];
+    return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true"><path d="${d} L${lp[0]} ${H} L4 ${H} Z" fill="rgba(0,0,0,.12)"/><path d="${d}" fill="none" stroke="#000" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${lp[0]}" cy="${lp[1]}" r="4.5" fill="#000"/></svg>`;
+  }
+  function gaugeSvg(p) {
+    p = Math.max(0, Math.min(1, p));
+    const cx = 60, cy = 58, R = 46, ang = Math.PI * (1 - p);
+    const x = cx + R * Math.cos(ang), y = cy - R * Math.sin(ang);
+    const nx = cx + (R-14) * Math.cos(ang), ny = cy - (R-14) * Math.sin(ang);
+    const col = p < 0.15 ? '#ff6b5b' : '#FFC400';
+    return `<svg width="120" height="70" viewBox="0 0 120 70" aria-hidden="true">
+      <path d="M14 58 A46 46 0 0 1 106 58" fill="none" stroke="#2c2c2c" stroke-width="10" stroke-linecap="round"/>
+      ${p > 0.01 ? `<path d="M14 58 A46 46 0 0 1 ${x.toFixed(1)} ${y.toFixed(1)}" fill="none" stroke="${col}" stroke-width="10" stroke-linecap="round"/>` : ''}
+      <line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="#f2f2f2" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="${cy}" r="5" fill="#f2f2f2"/>
+      <text x="10" y="70" font-size="10" fill="#9a9a9a">R</text><text x="104" y="70" font-size="10" fill="#9a9a9a">C</text></svg>`;
+  }
+  function renderLast(list, last, lc, ov) {
+    let al = '';
+    const v = vehicles.find(x => x.id === selId);
+    if (!last) {
+      $('hero').innerHTML = `<div class="card empty">Registre o primeiro abastecimento para começar a acompanhar o consumo.</div>`;
+      $('gauge').innerHTML = $('kpis').innerHTML = $('alerts').innerHTML = ''; return;
+    }
+    if (!isFull(last) && last.antesL == null) al += `<div class="alert info"><strong>Último abastecimento sem nível do tanque</strong>Edite no Histórico e informe o ponteiro para a média ficar exata.</div>`;
+    if (lc && ov && ov.val.length >= 2) {
+      const others = overall(list.filter(f => f !== lc));
+      const ref = others ? others.media : ov.media;
+      const d = (lc.media - ref) / ref;
+      if (d <= -0.08) al += `<div class="alert warn"><strong>Consumo ${num(Math.abs(d)*100,1)}% pior que sua média</strong>Confira a calibragem dos pneus, o filtro de ar e o uso do ar-condicionado.</div>`;
+    }
+    $('alerts').innerHTML = al;
+
+    // ----- cartão principal -----
+    if (!lc) {
+      $('hero').innerHTML = `<div class="hero"><div class="hero-top"><span>Média km/l</span></div>
+        <div class="hero-mid"><div class="hero-val">—</div></div>
+        <div style="font-size:13px;margin-top:6px;position:relative;z-index:1">A média aparece no próximo abastecimento com o nível do tanque (ou tanque cheio).</div></div>`;
+    } else {
+      const idx = list.indexOf(lc);
+      const prev = list.slice(0, idx).reverse().find(f => f.media != null);
+      const d = prev ? (lc.media - prev.media) / prev.media : null;
+      const meds = list.filter(f => f.media != null).slice(-8).map(f => f.media);
+      $('hero').innerHTML = `<div class="hero">
+        <div class="hero-top"><span>Média do último trecho</span>${d != null ? `<span class="trend ${d < 0 ? 'down' : ''}">${d >= 0 ? '▲' : '▼'} ${num(Math.abs(d)*100,1)}%</span>` : ''}</div>
+        <div class="hero-mid"><div class="hero-val">${num(lc.media)}<span>km/l</span></div>${spark(meds)}</div>
+        <div class="hero-foot">
+          <div><small>Custo/km</small><strong>${brl(lc.custoKm)}</strong></div>
+          <div><small>Média geral</small><strong>${num(ov.media,1)}</strong></div>
+          <div><small>Preço/L</small><strong>${brl(lc.precoL)}</strong></div>
+        </div></div>`;
+    }
+
+    // ----- medidor do tanque (estimado) -----
+    const kd = ritmo(list);
+    if (v?.tanque && ov && kd && last.depois != null) {
+      const dias = Math.max(0, days(last.data, today()));
+      const litros = Math.max(0, Math.min(v.tanque, last.depois - (kd * dias) / ov.media));
+      const p = litros / v.tanque, kmRest = litros * ov.media;
+      $('gauge').innerHTML = `<div class="card gauge">${gaugeSvg(p)}<div>
+        <div class="gt">Tanque agora (estimado)</div>
+        <div class="gv"><span>${num(litros,0)} L</span> • ${int(kmRest)} km</div>
+        <div class="gs">${p < 0.15 ? '<b style="color:var(--bad)">Hora de abastecer.</b> ' : ''}${dias ? `${dias} dia${dias===1?'':'s'} desde o último abastecimento` : 'Abastecido hoje'}, rodando ~${int(kd)} km/dia.</div></div></div>`;
+    } else $('gauge').innerHTML = '';
+
+    // ----- cartões secundários -----
+    $('kpis').innerHTML = lc ? `
+      <div class="kpi"><small class="ki">${ICO.road}KM no trecho</small><b>${int(lc.kmRod)}</b><em>em ${lc.dias} dia${lc.dias===1?'':'s'}</em></div>
+      <div class="kpi"><small class="ki">${ICO.pump}Consumiu</small><b>${num(lc.litSeg,1)} L</b><em>${brl(lc.valSeg)} no trecho</em></div>` : `
+      <div class="kpi"><small class="ki">${ICO.pump}Último abastecimento</small><b>${num(last.litros,1)} L</b><em>${brl(last.valor)} • ${fmtDate(last.data)}</em></div>
+      <div class="kpi"><small class="ki">${ICO.money}Preço por litro</small><b>${brl(last.precoL)}</b><em>${esc(last.comb)}</em></div>`;
+  }
+
+  function renderProj(list, ov) {
+    $('resumoProj').innerHTML = '';
+    if (!ov || list.length < 2) { $('proj').innerHTML = `<div class="kpi full"><div class="empty" style="padding:6px">A projeção aparece depois de dois tanques cheios.</div></div>`; return; }
+    const first = list[0], last = list[list.length-1];
+    const d = Math.max(1, days(first.data, last.data));
+    const kmDia = (last.km - first.km) / d;
+    const kmMes = kmDia * 30;
+    const gastoMes = kmMes * ov.custoKm;
+    const kmTanque = ov.km / ov.val.length;
+    const diasTanque = kmTanque / kmDia;
+    const prox = new Date(last.data + 'T12:00'); prox.setDate(prox.getDate() + Math.round(diasTanque));
+    const atraso = days(toISO(prox), today());
+    $('proj').innerHTML = `
+      <div class="kpi hl"><small>Gasto por mês</small><b>${brl(gastoMes)}</b><em>estimado</em></div>
+      <div class="kpi"><small>Gasto por ano</small><b>${brl(gastoMes*12)}</b><em>no ritmo atual</em></div>
+      <div class="kpi"><small>Rodagem</small><b>${int(kmDia)} <span style="font-size:16px">km/dia</span></b><em>≈ ${int(kmMes)} km/mês</em></div>
+      <div class="kpi"><small>Próximo abastecimento</small><b>${shortDate(toISO(prox))}</b><em>${atraso > 0 ? `previsto há ${atraso} dia${atraso===1?'':'s'}` : atraso === 0 ? 'previsto para hoje' : `em ~${int(-atraso)} dia${atraso===-1?'':'s'}`} • perto de ${int(last.km + kmTanque)} km</em></div>
+      <div class="kpi full"><small>Um tanque cheio rende em média</small><b>${int(kmTanque)} km</b><em>a cada ${num(diasTanque,0)} dias, aproximadamente</em></div>`;
+    $('resumoProj').innerHTML = `
+      <div class="kpi"><small class="ki">${ICO.money}Gasto por mês</small><b>${brl(gastoMes)}</b><em>estimado</em></div>
+      <div class="kpi"><small class="ki">${ICO.cal}Próximo abastec.</small><b>${shortDate(toISO(prox))}</b><em>${atraso > 0 ? `previsto há ${atraso} dia${atraso===1?'':'s'}` : atraso === 0 ? 'previsto para hoje' : `em ~${int(-atraso)} dia${atraso===-1?'':'s'}`}</em></div>`;
+  }
+
+  function renderCmp(list) {
+    const et = parseFloat($('cEt').value), gas = parseFloat($('cGas').value);
+    if (!$('cEt').value) { const le = [...list].reverse().find(f => f.comb === 'Etanol'); if (le) $('cEt').placeholder = 'Último: ' + num(le.precoL); }
+    if (!$('cGas').value) { const lg = [...list].reverse().find(f => f.comb === 'Gasolina'); if (lg) $('cGas').placeholder = 'Último: ' + num(lg.precoL); }
+    if (!(et > 0 && gas > 0)) { $('cmpOut').innerHTML = 'Informe o preço dos dois combustíveis no posto para saber qual compensa no seu carro.'; return; }
+    const segs = list.filter(f => f.media != null);
+    const avg = c => { const s = segs.filter(f => f.comb === c); if (!s.length) return null; return s.reduce((a,f)=>a+f.kmRod,0) / s.reduce((a,f)=>a+f.litSeg,0); };
+    let mEt = avg('Etanol'), mGas = avg('Gasolina'), fonte;
+    if (mEt && mGas) fonte = 'com as médias reais do seu carro nos dois combustíveis';
+    else if (mEt) { mGas = mEt / 0.7; fonte = 'com sua média real no etanol e a regra dos 70% para estimar a gasolina (o etanol rende cerca de 70% do que a gasolina rende)'; }
+    else if (mGas) { mEt = mGas * 0.7; fonte = 'com sua média real na gasolina e a regra dos 70% para estimar o etanol'; }
+    else { fonte = 'pela regra dos 70%'; }
+    const ratio = et / gas;
+    let html;
+    if (mEt && mGas) {
+      const cEt = et / mEt, cGas = gas / mGas;
+      const win = cEt <= cGas ? 'Etanol' : 'Gasolina';
+      const eco = Math.abs(cEt - cGas);
+      html = `<div class="verdict">Abasteça com ${win}</div>
+        <div class="cmp"><div class="${win==='Etanol'?'win':''}">Etanol<b>${brl(cEt)}/km</b>${num(mEt,1)} km/l</div><div class="${win==='Gasolina'?'win':''}">Gasolina<b>${brl(cGas)}/km</b>${num(mGas,1)} km/l</div></div>
+        <p class="hint">Economia de ${brl(eco)} por km, cerca de ${brl(eco*1000)} a cada 1.000 km. Cálculo feito ${fonte}. O etanol custa ${num(ratio*100,1)}% do preço da gasolina.</p>`;
+    } else {
+      const win = ratio <= 0.7 ? 'Etanol' : 'Gasolina';
+      html = `<div class="verdict">Abasteça com ${win}</div><p class="hint">O etanol custa ${num(ratio*100,1)}% do preço da gasolina. Abaixo de 70%, o etanol costuma compensar. Com seus próprios registros, este cálculo fica mais preciso.</p>`;
+    }
+    $('cmpOut').innerHTML = html;
+  }
+
+  function renderChart(list) {
+    const pts = graph === 'preco' ? list.map(f => ({d:f.data, v:f.precoL}))
+      : list.filter(f => f.media != null).map(f => ({d:f.data, v: graph==='media' ? f.media : f.custoKm}));
+    if (pts.length < 2) { $('chart').innerHTML = `<div class="empty">O gráfico aparece com pelo menos dois pontos.</div>`; return; }
+    const W = 600, H = 220, pl = 46, pr = 14, pt = 22, pb = 30;
+    const vals = pts.map(p => p.v); let mn = Math.min(...vals), mx = Math.max(...vals);
+    const pad = (mx - mn) * 0.25 || mx * 0.05; mn -= pad; mx += pad;
+    const x = i => pl + (pts.length === 1 ? 0 : i * (W-pl-pr) / (pts.length-1));
+    const y = v => pt + (1 - (v - mn)/(mx - mn)) * (H-pt-pb);
+    const fmt = v => graph === 'media' ? num(v,1) : num(v,2);
+    const avg = vals.reduce((a,b)=>a+b,0)/vals.length;
+    let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Gráfico">`;
+    for (let k=0;k<=3;k++){ const v = mn + (mx-mn)*k/3; s += `<line x1="${pl}" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="#2c2c2c"/><text x="${pl-8}" y="${y(v)+4}" text-anchor="end" font-size="12" fill="#9a9a9a">${fmt(v)}</text>`; }
+    s += `<line x1="${pl}" x2="${W-pr}" y1="${y(avg)}" y2="${y(avg)}" stroke="#9a9a9a" stroke-dasharray="4 4"/><text x="${W-pr}" y="${y(avg)-6}" text-anchor="end" font-size="11" fill="#9a9a9a">média ${fmt(avg)}</text>`;
+    s += `<polyline fill="none" stroke="#FFC400" stroke-width="3" stroke-linejoin="round" points="${pts.map((p,i)=>`${x(i)},${y(p.v)}`).join(' ')}"/>`;
+    pts.forEach((p,i) => { s += `<circle cx="${x(i)}" cy="${y(p.v)}" r="5" fill="#FFC400" stroke="#181818" stroke-width="2"/><text x="${x(i)}" y="${y(p.v)-11}" text-anchor="middle" font-size="12" font-weight="600" fill="#f2f2f2">${fmt(p.v)}</text><text x="${x(i)}" y="${H-8}" text-anchor="middle" font-size="11" fill="#9a9a9a">${shortDate(p.d)}</text>`; });
+    $('chart').innerHTML = s + '</svg>';
+  }
+  document.querySelectorAll('[data-g]').forEach(b => b.onclick = () => {
+    graph = b.dataset.g; document.querySelectorAll('[data-g]').forEach(x => x.classList.toggle('on', x===b)); render();
+  });
+
+  function renderGeral(list, ov) {
+    if (!ov) { $('geral').innerHTML = `<div class="kpi full"><div class="empty" style="padding:6px">A visão geral aparece após dois tanques cheios.</div></div>`; return; }
+    const totalGasto = list.reduce((s,f) => s + f.valor, 0);
+    const totalL = list.reduce((s,f) => s + f.litros, 0);
+    const best = ov.val.reduce((a,b) => b.media > a.media ? b : a), worst = ov.val.reduce((a,b) => b.media < a.media ? b : a);
+    const precos = list.map(f => f.precoL);
+    $('geral').innerHTML = `
+      <div class="kpi"><small>Média geral</small><b>${num(ov.media)}</b><em>km/l</em></div>
+      <div class="kpi"><small>Custo médio/km</small><b>${brl(ov.custoKm)}</b><em>${int(ov.km)} km medidos</em></div>
+      <div class="kpi"><small>KM total rodado</small><b>${int(list[list.length-1].km - list[0].km)}</b><em>${list.length} abastecimentos</em></div>
+      <div class="kpi"><small>Total gasto</small><b>${brl(totalGasto)}</b><em>${num(totalL,1)} L no total</em></div>
+      <div class="kpi"><small>Melhor média</small><b>${num(best.media)}</b><em>${fmtDate(best.data)}</em></div>
+      <div class="kpi"><small>Pior média</small><b>${num(worst.media)}</b><em>${fmtDate(worst.data)}</em></div>
+      <div class="kpi full"><small>Preço do litro no período</small><b>${brl(Math.min(...precos))} – ${brl(Math.max(...precos))}</b><em>preço médio pago: ${brl(totalGasto/totalL)}/L</em></div>`;
+  }
+
+  function renderHist(list) {
+    if (!list.length) { $('hist').innerHTML = `<div class="empty">Nenhum abastecimento registrado.</div>`; return; }
+    $('hist').innerHTML = list.slice().reverse().map((f,ri) => {
+      const isFirst = ri === list.length - 1;
+      const right = f.media != null ? `<b>${num(f.media)} km/l</b><div class="m">${brl(f.custoKm)}/km</div>`
+        : !isFull(f) ? `<div class="m">parcial</div>` : `<div class="m">${isFirst ? '1º registro' : 'base'}</div>`;
+      return `<div class="it">
+        <div><div class="d">${fmtDate(f.data)} • ${int(f.km)} km</div>
+          <div class="m">${num(f.litros)} L ${esc(f.comb)} • ${brl(f.valor)} (${brl(f.precoL)}/L)</div>
+          ${f.posto || !isFull(f) || f.antesL != null ? `<div class="m">${f.antesL != null ? `<span class="tag p">Antes: ${nivelTxt(f)}</span>` : ''}${f.posto ? `<span class="tag p">${esc(f.posto)}</span>` : ''}${!isFull(f) ? '<span class="tag p">Parcial</span>' : ''}</div>` : ''}
+          ${f.media != null && f.litSeg != null && Math.abs(f.litSeg - f.litros) > 0.5 ? `<div class="m">Consumiu ${num(f.litSeg,1)} L no trecho</div>` : ''}</div>
+        <div class="r">${right}</div>
+        <div class="acts"><button class="ghost" data-ed="${f.id}">Editar</button><button class="ghost" data-del="${f.id}">Excluir</button></div>
+      </div>`; }).join('');
+    $('hist').querySelectorAll('.it').forEach(it => it.onclick = e => { if (e.target.closest('button')) return; const o = it.classList.contains('open'); $('hist').querySelectorAll('.it.open').forEach(x => x.classList.remove('open')); if (!o) it.classList.add('open'); });
+    $('hist').querySelectorAll('[data-ed]').forEach(b => b.onclick = () => editFuel(b.dataset.ed));
+    $('hist').querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+      if (b.dataset.armed) { store.remove(b.dataset.del).catch(() => flash('fMsg','Não foi possível excluir.',true)); }
+      else { b.dataset.armed = 1; b.textContent = 'Confirmar exclusão'; b.classList.add('del'); setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent='Excluir'; b.classList.remove('del'); } }, 4000); }
+    });
+  }
+
+  function renderChips() {
+    $('chips').innerHTML = vehicles.map(v => `<button class="chip ${v.id===selId?'on':''}" data-v="${v.id}">${esc(v.modelo)}</button>`).join('')
+      + `<button class="chip add" id="addVeh">+ Novo veículo</button>`;
+    $('chips').querySelectorAll('[data-v]').forEach(b => b.onclick = () => { selId = b.dataset.v; cancelFuelEdit(); delete $('fComb').dataset.touched; render(); });
+    $('addVeh').onclick = () => openVehForm(null);
+  }
+
+  function flash(id, text, err) {
+    const el = $(id); el.textContent = text; el.className = 'msg ' + (err ? 'err' : 'ok');
+    if (!err) setTimeout(() => { if (el.textContent === text) el.textContent = ''; }, 3500);
+  }
+
+  // ---------- Veículo ----------
+  function openVehForm(v) {
+    editVehId = v?.id || null;
+    $('vehFormTitle').textContent = v ? 'Editar veículo' : 'Novo veículo';
+    $('vModelo').value = v?.modelo || ''; $('vTipo').value = v?.tipo || 'Carro';
+    $('vComb').value = v?.comb || 'Flex'; $('vPlaca').value = v?.placa || ''; $('vTanque').value = v?.tanque || '';
+    $('vDelete').classList.toggle('hidden', !v); $('vDelete').textContent = 'Excluir veículo'; delete $('vDelete').dataset.armed;
+    $('vMsg').textContent = '';
+    $('vehForm').classList.remove('hidden'); go('resumo'); render();
+    $('vModelo').focus();
+  }
+  function closeVehForm() { $('vehForm').classList.add('hidden'); render(); }
+  $('vCancel').onclick = closeVehForm;
+  $('vSave').onclick = async () => {
+    const modelo = $('vModelo').value.trim();
+    if (!modelo) return flash('vMsg','Informe o modelo do veículo.',true);
+    const tq = parseFloat($('vTanque').value);
+    if ($('vTanque').value && !(tq > 0 && tq < 2000)) return flash('vMsg','Capacidade do tanque inválida.',true);
+    const id = editVehId || rid('v');
+    const old = vehicles.find(v => v.id === id);
+    const obj = { kind:'veh', modelo, tipo:$('vTipo').value, comb:$('vComb').value,
+      placa:$('vPlaca').value.trim().toUpperCase(), tanque: tq > 0 ? tq : null, criado: old?.criado || Date.now() };
+    $('vSave').disabled = true;
+    try { await store.save(id, obj); selId = id; closeVehForm(); }
+    catch(e) { flash('vMsg', e?.code === 'quota_exceeded' ? 'Limite de armazenamento atingido.' : 'Não foi possível salvar. Tente de novo.', true); }
+    $('vSave').disabled = false;
+  };
+  $('vDelete').onclick = async () => {
+    const b = $('vDelete');
+    if (!b.dataset.armed) { b.dataset.armed = 1; b.textContent = 'Toque de novo para excluir tudo'; return; }
+    const id = editVehId;
+    try {
+      for (const f of fuels.filter(f => f.vehId === id)) await store.remove(f.id);
+      await store.remove(id); selId = null; closeVehForm();
+    } catch(e) { flash('vMsg','Não foi possível excluir.',true); }
+  };
+
+  // ---------- Abastecimento ----------
+  function readFuel() {
+    return { data: $('fData').value, km: parseFloat($('fKm').value), litros: parseFloat($('fLitros').value),
+      valor: parseFloat($('fValor').value), comb: $('fComb').value, posto: $('fPosto').value.trim(), cheio: $('fCheio').checked, ...nivelLido() };
+  }
+  function nivelLido() {
+    const n = $('fNivel').value, cap = capOf();
+    if (n === '') return { antes: null, nivel: null };
+    if (n === 'L') { const l = parseFloat($('fAntesL').value); return l >= 0 ? { antes: +l.toFixed(2), nivel: 'L' } : { antes: null, nivel: null }; }
+    return cap ? { antes: +(cap * parseFloat(n)).toFixed(2), nivel: n } : { antes: null, nivel: null };
+  }
+  const nivelTxt = f => { const m = {'0.08':'reserva','0.125':'1/8','0.25':'1/4','0.375':'3/8','0.5':'1/2','0.625':'5/8','0.75':'3/4','0.875':'7/8'}; return f.nivel && m[f.nivel] ? `${m[f.nivel]} (~${num(f.antes,1)} L)` : `${num(f.antes,1)} L`; };
+  function preview() {
+    const f = readFuel();
+    if (!(f.km > 0 && f.litros > 0 && f.valor > 0)) { $('fPrev').innerHTML = 'Preencha os campos para ver a prévia do cálculo.'; return; }
+    const others = fuelsOf(selId).filter(x => x.id !== editFuelId);
+    const sim = withStats([...others, {...f, id:'__sim'}].sort((a,b) => a.km - b.km));
+    const s = sim.find(x => x.id === '__sim');
+    let h = `Preço por litro: <b>${brl(f.valor/f.litros)}</b>`;
+    if (s.media != null) h += `<br>Rodou <b>${int(s.kmRod)} km</b> e consumiu <b>${num(s.litSeg)} L</b> • Média <b>${num(s.media)} km/l</b> • <b>${brl(s.custoKm)}/km</b>`;
+    else if (f.antes == null && !f.cheio) h += '<br>Sem o nível do tanque, a média deste trecho sai no próximo abastecimento com nível informado (ou tanque cheio).';
+    else h += '<br>Primeiro registro: serve de base para a próxima média.';
+    if (f.antes != null) { const cap = capOf(); h += `<br>No tanque: ${num(f.antes,1)} L + ${num(f.litros,1)} L = <b>${num(f.antes + f.litros,1)} L</b>${cap ? ` de ${num(cap,0)} L` : ''}`; }
+    const est = estimaTanque(f.km);
+    if (est != null && f.antes == null) h += `<br><span style="color:var(--mut)">Pelo seu consumo médio, deveria haver uns <b>${num(Math.max(0,est),1)} L</b> no tanque.</span>`;
+    $('fPrev').innerHTML = h;
+  }
+  ['fKm','fLitros','fValor'].forEach(i => $(i).addEventListener('input', preview));
+  $('fCheio').addEventListener('change', preview);
+  $('fNivel').addEventListener('change', () => { $('fAntesL').classList.toggle('hidden', $('fNivel').value !== 'L'); preview(); });
+  $('fAntesL').addEventListener('input', preview);
+  $('fComb').addEventListener('change', () => $('fComb').dataset.touched = 1);
+  ['cEt','cGas'].forEach(i => $(i).addEventListener('input', () => {
+    if (i === 'cGas') lsSet('nio-gas', $('cGas').value);
+    renderCmp(withStats(fuelsOf(selId)));
+  }));
+
+  function editFuel(id) {
+    const f = fuels.find(x => x.id === id); if (!f) return;
+    editFuelId = id;
+    $('fData').value = f.data; $('fKm').value = f.km; $('fLitros').value = f.litros; $('fValor').value = f.valor;
+    $('fComb').value = f.comb; $('fPosto').value = f.posto || ''; $('fCheio').checked = isFull(f);
+    $('fNivel').value = f.antes == null ? '' : (f.nivel && [...$('fNivel').options].some(o => o.value === f.nivel) ? f.nivel : 'L');
+    $('fAntesL').value = f.antes == null ? '' : f.antes; $('fAntesL').classList.toggle('hidden', $('fNivel').value !== 'L');
+    $('fSave').textContent = 'Atualizar abastecimento';
+    $('fTitle').innerHTML = `Editar abastecimento <button class="ghost" id="fCancelEd" style="margin-left:auto;font-family:Inter;text-transform:none;letter-spacing:0">Cancelar</button>`;
+    $('fCancelEd').onclick = () => { cancelFuelEdit(); render(); go('hist'); };
+    go('abastecer'); preview();
+  }
+  function cancelFuelEdit() {
+    editFuelId = null; $('fSave').textContent = 'Salvar abastecimento'; $('fTitle').textContent = 'Novo abastecimento';
+    $('fKm').value = $('fLitros').value = $('fValor').value = $('fPosto').value = $('fAntesL').value = ''; $('fNivel').value = ''; $('fAntesL').classList.add('hidden'); $('fCheio').checked = true; $('fData').value = today();
+  }
+  $('fSave').onclick = async () => {
+    const f = readFuel();
+    if (!selId) return;
+    if (!f.data) return flash('fMsg','Informe a data.',true);
+    if (!(f.km > 0)) return flash('fMsg','Informe o KM atual do odômetro.',true);
+    if (!(f.litros > 0)) return flash('fMsg','Informe a quantidade de litros.',true);
+    if (!(f.valor > 0)) return flash('fMsg','Informe o valor pago.',true);
+    const pl = f.valor / f.litros;
+    if (pl < 1 || pl > 20) return flash('fMsg',`Preço por litro de ${brl(pl)} parece errado. Confira litros e valor.`,true);
+    const v = vehicles.find(x => x.id === selId);
+    if (v?.tanque && f.litros > v.tanque * 1.1) return flash('fMsg',`${num(f.litros)} L é mais que o tanque (${num(v.tanque,0)} L). Confira os litros.`,true);
+    if (f.antes != null && v?.tanque && f.antes + f.litros > v.tanque * 1.08) return flash('fMsg',`${num(f.antes,1)} L que havia + ${num(f.litros,1)} L colocados não cabem num tanque de ${num(v.tanque,0)} L. Confira o nível.`,true);
+    const others = fuelsOf(selId).filter(x => x.id !== editFuelId);
+    if (others.some(x => x.km === f.km)) return flash('fMsg','Já existe um abastecimento com esse KM.',true);
+    const maxKm = others.length ? others[others.length-1].km : 0;
+    if (!editFuelId && f.km < maxKm) return flash('fMsg',`O KM deve ser maior que o último registrado (${int(maxKm)} km).`,true);
+    const id = editFuelId || rid('f');
+    $('fSave').disabled = true;
+    try {
+      const doc = { kind:'fuel', vehId: selId, ...f, km: Math.round(f.km), litros: +f.litros.toFixed(3), valor: +f.valor.toFixed(2) };
+      if (doc.antes == null) { delete doc.antes; delete doc.nivel; }
+      await store.save(id, doc);
+      const editou = !!editFuelId;
+      cancelFuelEdit(); render(); go(editou ? 'hist' : 'resumo');
+      toast(editou ? 'Abastecimento atualizado' : 'Abastecimento salvo!');
+    } catch(e) { flash('fMsg', e?.code === 'quota_exceeded' ? 'Limite de armazenamento atingido.' : 'Não foi possível salvar. Tente de novo.', true); }
+    $('fSave').disabled = false;
+  };
+
+  let toastT;
+  function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 2200); }
+  // ---------- Navegação ----------
+  let tab = 'resumo';
+  function go(t) {
+    tab = t;
+    document.querySelectorAll('section[data-tab]').forEach(sec => sec.classList.toggle('hidden', sec.dataset.tab !== t));
+    document.querySelectorAll('.tabbar [data-go]').forEach(b => b.classList.toggle('on', b.dataset.go === t));
+    if (t === 'hist' && !vehicles.length) $('bkBox').open = true;
+    window.scrollTo(0, 0);
+    if (t === 'analise') render(); // redesenha gráfico com tamanho certo
+  }
+  document.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) go(b.dataset.go); });
+  document.querySelectorAll('[data-an]').forEach(b => b.onclick = () => {
+    document.querySelectorAll('[data-an]').forEach(x => x.classList.toggle('on', x === b));
+    document.querySelectorAll('[data-an-p]').forEach(p => p.classList.toggle('hidden', p.dataset.anP !== b.dataset.an));
+  });
+
+  // ---------- Backup ----------
+  const inClaude = (() => { try { return !!window.claude || window.self !== window.top; } catch(e) { return true; } })();
+  if (inClaude) { $('bDown').classList.add('hidden'); $('bInfo').textContent = 'Toque em Copiar backup e cole o texto na versão instalada do NioControle (em Restaurar backup).'; }
+  function backupText() {
+    const dados = {};
+    [...vehicles, ...fuels].forEach(({id, ...rest}) => { dados[id] = rest; });
+    return JSON.stringify({ app:'NioControle', versao:1, exportado:new Date().toISOString(), dados });
+  }
+  $('bDown').onclick = () => {
+    if (!vehicles.length) return flash('bMsg','Não há dados para salvar ainda.',true);
+    try {
+      const blob = new Blob([backupText()], {type:'application/json'});
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = `niocontrole-backup-${today()}.json`; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      lsSet('nio-last-backup', today());
+      flash('bMsg','Backup baixado. Guarde o arquivo em local seguro.',false);
+    } catch(e) { flash('bMsg','Não foi possível baixar. Use Copiar backup.',true); }
+  };
+  $('bCopy').onclick = async () => {
+    if (!vehicles.length) return flash('bMsg','Não há dados para copiar ainda.',true);
+    const t = backupText();
+    try { await navigator.clipboard.writeText(t); lsSet('nio-last-backup', today()); flash('bMsg','Backup copiado! Cole no WhatsApp, e-mail ou na outra versão do app.',false); }
+    catch(e) { $('bText').value = t; $('bText').select(); flash('bMsg','Copie o texto selecionado na caixa abaixo.',false); }
+  };
+  $('bFile').onchange = e => {
+    const file = e.target.files[0]; if (!file) return;
+    const r = new FileReader(); r.onload = () => { $('bText').value = r.result; flash('bMsg','Arquivo carregado. Toque em Restaurar.',false); };
+    r.readAsText(file); e.target.value = '';
+  };
+  $('bRestore').onclick = async () => {
+    let b; try { b = JSON.parse($('bText').value.trim()); } catch(e) { return flash('bMsg','Texto de backup inválido.',true); }
+    if (!b || b.app !== 'NioControle' || typeof b.dados !== 'object') return flash('bMsg','Esse texto não é um backup do NioControle.',true);
+    const items = Object.entries(b.dados).filter(([id,d]) => d && (d.kind === 'veh' || d.kind === 'fuel') && /^[A-Za-z0-9_.~:@+-]{1,100}$/.test(id));
+    if (!items.length) return flash('bMsg','O backup está vazio.',true);
+    if (!store) return flash('bMsg','Aguarde o app terminar de carregar.',true);
+    $('bRestore').disabled = true;
+    try {
+      items.sort((a,b) => (a[1].kind === 'veh' ? 0 : 1) - (b[1].kind === 'veh' ? 0 : 1));
+      for (const [id,d] of items) await store.save(id, d);
+      $('bText').value = '';
+      const nv = items.filter(i => i[1].kind==='veh').length, nf = items.length - nv;
+      flash('bMsg',`Restaurado: ${nv} veículo(s) e ${nf} abastecimento(s).`,false);
+    } catch(e) { flash('bMsg','Falha ao restaurar. Tente de novo.',true); }
+    $('bRestore').disabled = false;
+  };
+
+  // ---------- PWA ----------
+  if (!inClaude) {
+    if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); }); }
+    try { navigator.storage?.persist?.(); } catch(e) {}
+  }
+
+  render();
+  init();
+})();
+</script>
+</body>
+</html>
